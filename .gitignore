@@ -1,3 +1,6 @@
 kirc
 *.a
 *.o
+.ccls/
+.ccls-cache/
+compile_commands.json

@@ -1,3 +1,7 @@
+this is my fork of [mcpcpc/kirc](https://github.com/mcpcpc/kirc) and you should
+not use this unless you want my mods  
+use his version instead
+
 # kirc
 
 kirc (KISS for IRC) is a tiny IRC client written in POSIX C99.

@@ -1062,13 +1062,13 @@ static void param_print_private(param p)
     struct tm *timeinfo;
     time ( &rawtime );
     timeinfo = localtime ( &rawtime );
-    char timestamp[9];
+    char timestamp[13];
     if (!small_screen) {
         if (strnlen(p->nickname, p->nicklen) > (size_t)p->nicklen - 8) {
             *(p->nickname + p->nicklen - 8) = '\0';
         }
-        strcpy(timestamp, "[");
-        char buf[5];
+        strcpy(timestamp, "\x1b[90m");
+        char buf[8];
         if (timeinfo->tm_hour < 10) {
             strcat(timestamp, "0");
         }
@@ -1077,7 +1077,7 @@ static void param_print_private(param p)
         if (timeinfo->tm_min < 10) {
             strcat(timestamp, "0");
         }
-        snprintf(buf, sizeof(buf), "%d] ", timeinfo->tm_min);
+        snprintf(buf, sizeof(buf), "%d\x1b[0m ", timeinfo->tm_min);
         strcat(timestamp, buf);
         printf("%s", timestamp);
     }
