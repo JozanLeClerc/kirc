@@ -1067,7 +1067,7 @@ static void param_print_private(param p)
 		*(p->nickname + p->nicklen - 8) = '\0';
 	}
 	strcpy(timestamp, "\x1b[90m");
-	char buf[16];
+	char buf[7];
 	if (timeinfo->tm_hour < 10) {
 		strcat(timestamp, "0");
 	}
@@ -1143,12 +1143,7 @@ static void raw_parser(char *string)
         .offset = 0
     };
 
-    if (WRAP_LEN > p.maxcols / 3) {
-        p.nicklen = p.maxcols / 3;
-    }
-    else {
-        p.nicklen = WRAP_LEN;
-    }
+	p.nicklen = WRAP_LEN;
     if (*chan != '\0' && !memcmp(p.command, "001", sizeof("001") - 1)) {
         static char not_first_time = 0;
         if (not_first_time) {
@@ -1174,22 +1169,29 @@ static void raw_parser(char *string)
         memmove(chan, tok, ptr - tok + 1);
         return;
     }
-    if (!memcmp(p.command, "QUIT", sizeof("QUIT") - 1)) {
-        param_print_quit(&p);
-        printf("\x1b[0m\r\n");
-        return;
-    }if (!memcmp(p.command, "PART", sizeof("PART") - 1)) {
-        param_print_part(&p);
-        printf("\x1b[0m\r\n");
-        return;
-    }if (!memcmp(p.command, "JOIN", sizeof("JOIN") - 1)) {
-        param_print_join(&p);
-        printf("\x1b[0m\r\n");
-        return;
-    }if (!memcmp(p.command, "NICK", sizeof("NICK") - 1)) {
-        param_print_nick(&p);
-        printf("\x1b[0m\r\n");
-        return;
+	if (filter_joins == 1 &&
+		(!memcmp(p.command, "QUIT", sizeof("QUIT") - 1) ||
+		 !memcmp(p.command, "PART", sizeof("PART") - 1) ||
+		 !memcmp(p.command, "JOIN", sizeof("JOIN") - 1) ||
+		 !memcmp(p.command, "NICK", sizeof("NICK") - 1))) {
+		return;
+	}
+	if (!memcmp(p.command, "QUIT", sizeof("QUIT") - 1)) {
+		param_print_quit(&p);
+		printf("\xb[0m\r\n");
+		return;
+	}if (!memcmp(p.command, "PART", sizeof("PART") - 1)) {
+		param_print_part(&p);
+		printf("\x1b[0m\r\n");
+		return;
+	}if (!memcmp(p.command, "JOIN", sizeof("JOIN") - 1)) {
+		param_print_join(&p);
+		printf("\x1b[0m\r\n");
+		return;
+	}if (!memcmp(p.command, "NICK", sizeof("NICK") - 1)) {
+		param_print_nick(&p);
+		printf("\x1b[0m\r\n");
+		return;
     }if ((!memcmp(p.command, "PRIVMSG", sizeof("PRIVMSG") - 1)) || (!memcmp(p.command, "NOTICE", sizeof("NOTICE") - 1))) {
         filter_colors(p.message); /* this can be slow if -f is passed to kirc */
         param_print_private(&p);
@@ -1804,7 +1806,7 @@ int main(int argc, char **argv)
 {
     char buf[BUFSIZ];
     int cval;
-    while ((cval = getopt(argc, argv, "s:p:o:m:n:k:c:u:r:a:D:46dfexvV")) != -1) {
+    while ((cval = getopt(argc, argv, "s:p:o:m:n:k:c:u:r:a:D:46dfFexvV")) != -1) {
         switch (cval) {
         case 'v':
             version();
@@ -1826,6 +1828,9 @@ int main(int argc, char **argv)
             break;
         case 'f':
             filter = 1;
+            break;
+        case 'F':
+            filter_joins = 1;
             break;
         case 's':
             host = optarg;

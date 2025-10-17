@@ -57,6 +57,7 @@ static char sasl = 0;           /* SASL method */
 static char isu8 = 0;           /* UTF-8 flag */
 static char dcc = 0;            /* DCC flag */
 static char filter = 0;	        /* flag to filter ansi colors */
+static char filter_joins = 0;   /* filter join/part/nick/quit messages */
 static char* dcc_dir = NULL;    /* DCC download directory */
 static mode_t dcc_mode = DCC_MODE; /* file permissions for downloaded files */
 static const char *host = "irc.libera.chat";  /* host address */
