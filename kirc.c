@@ -1067,7 +1067,7 @@ static void param_print_private(param p)
 		*(p->nickname + p->nicklen - 8) = '\0';
 	}
 	strcpy(timestamp, "\x1b[90m");
-	char buf[7];
+	char buf[9];
 	if (timeinfo->tm_hour < 10) {
 		strcat(timestamp, "0");
 	}
@@ -1079,25 +1079,24 @@ static void param_print_private(param p)
 	snprintf(buf, sizeof(buf), "%d\x1b[0m ", timeinfo->tm_min);
 	strcat(timestamp, buf);
 	printf("%s", timestamp);
-    int s = 0;
-    if (strnlen(p->nickname, MSG_MAX) <= (size_t)p->nicklen + strnlen(timestamp, sizeof(timestamp))) {
-        s = p->nicklen - strnlen(p->nickname, MSG_MAX) - strnlen(timestamp, sizeof(timestamp));
-    }
     if (p->channel != NULL && (strcmp(p->channel, nick) == 0)) {
         handle_ctcp(p);
-        printf("%*s\x1b[33;1m%-.*s [PRIVMSG]\x1b[36m ", s, "", p->nicklen, p->nickname);
+        printf("\x1b[33;1m<%-.*s> [PRIVMSG]\x1b[36m ", p->nicklen, p->nickname);
         p->offset += sizeof(" [PRIVMSG]");
     } else if (p->channel != NULL && strcmp(p->channel + 1, chan)) {
-        printf("%*s\x1b[33;1m%-.*s\x1b[0m", s, "", p->nicklen, p->nickname);
+        printf("\x1b[33;1m<%-.*s>\x1b[0m", p->nicklen, p->nickname);
         printf(" [\x1b[33m%s\x1b[0m] ", p->channel);
         p->offset += 12 + strnlen(p->channel, CHA_MAX);
     } else {
-        printf("%*s\x1b[33;1m%-.*s\x1b[0m ", s, "", p->nicklen, p->nickname);
-    }
-    if (!memcmp(p->message, "\x01" "ACTION", sizeof("\x01" "ACTION") - 1)) {
-        p->message += sizeof("ACTION");
-        p->offset += sizeof("[ACTION] ");
-        printf("[ACTION] ");
+		if (!memcmp(p->message, "\x01" "ACTION", sizeof("\x01" "ACTION") - 1)) {
+			p->message += sizeof("ACTION");
+			p->offset += sizeof(" \x1b[33;1m* ");
+			printf(" \x1b[33;1m* ");
+			printf("\x1b[33;1m%-.*s\x1b[0m ", p->nicklen, p->nickname);
+		}
+		else {
+			printf("\x1b[33;1m<%-.*s>\x1b[0m ", p->nicklen, p->nickname);
+		}
     }
 }
 
@@ -1178,7 +1177,7 @@ static void raw_parser(char *string)
 	}
 	if (!memcmp(p.command, "QUIT", sizeof("QUIT") - 1)) {
 		param_print_quit(&p);
-		printf("\xb[0m\r\n");
+		printf("\x1b[0m\r\n");
 		return;
 	}if (!memcmp(p.command, "PART", sizeof("PART") - 1)) {
 		param_print_part(&p);
