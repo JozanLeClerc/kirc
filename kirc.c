@@ -1102,11 +1102,7 @@ static void param_print_private(param p)
 
 static void param_print_channel(param p)
 {
-    int s = 0;
-    if (strnlen(p->nickname, MSG_MAX) <= (size_t)p->nicklen) {
-        s = p->nicklen - strnlen(p->nickname, MSG_MAX);
-    }
-    printf("%*s\x1b[33;1m%-.*s\x1b[0m ", s, "", p->nicklen, p->nickname);
+    printf("      \x1b[33;1m%-.*s\x1b[0m ", p->nicklen, p->nickname);
     if (p->params) {
         printf("%s", p->params);
         p->offset += strnlen(p->params, CHA_MAX);
