@@ -90,7 +90,6 @@ static struct termios orig;
 static int history_len = 0;
 static char history_wrap = 0;
 static char history[HIS_MAX][MSG_MAX];
-static char small_screen;
 
 typedef struct PARAMETERS {
     char *prefix;

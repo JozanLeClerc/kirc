@@ -1,8 +1,10 @@
 .POSIX:
-ALL_WARNING = -Wall -Wextra -pedantic -std=c99
+ALL_WARNING = -Wall -Werror -Wextra -Wno-unused-result -pedantic -std=c99
 PREFIX ?= /usr/local
 BINDIR = $(PREFIX)/bin
 MANDIR = $(PREFIX)/share/man
+CFLAGS = -O0 -g3
+CFLAGS += -fsanitize=address
 
 kirc: kirc.c kirc.h
 	$(CC) $(CFLAGS) -D_FILE_OFFSET_BITS=64 $(LDFLAGS) ${ALL_WARNING} kirc.c -o kirc
