@@ -1056,16 +1056,13 @@ static void filter_colors(char *string)
     return;
 }
 
-static void param_print_private(param p)
+static void print_timestamp(void)
 {
     time_t rawtime;
     struct tm *timeinfo;
     time ( &rawtime );
     timeinfo = localtime ( &rawtime );
     char timestamp[16];
-	if (strnlen(p->nickname, p->nicklen) > (size_t)p->nicklen - 8) {
-		*(p->nickname + p->nicklen - 8) = '\0';
-	}
 	strcpy(timestamp, "\x1b[90m");
 	char buf[9];
 	if (timeinfo->tm_hour < 10) {
@@ -1079,6 +1076,14 @@ static void param_print_private(param p)
 	snprintf(buf, sizeof(buf), "%d\x1b[0m ", timeinfo->tm_min);
 	strcat(timestamp, buf);
 	printf("%s", timestamp);
+}
+
+static void param_print_private(param p)
+{
+	print_timestamp();
+	if (strnlen(p->nickname, p->nicklen) > (size_t)p->nicklen - 8) {
+		*(p->nickname + p->nicklen - 8) = '\0';
+	}
     if (p->channel != NULL && (strcmp(p->channel, nick) == 0)) {
         handle_ctcp(p);
         printf("\x1b[33;1m<%-.*s> [PRIVMSG]\x1b[36m ", p->nicklen, p->nickname);
@@ -1609,13 +1614,19 @@ close_fd:
     close(file_fd);
 }
 
-static inline void chan_privmsg(state l, char *channel, int offset)
+static inline void chan_privmsg(state l, char *channel, int offset, const char *nick, char default_chan)
 {
+	print_timestamp();
     if(l->nick_privmsg == 0) {
-        raw("PRIVMSG #%s :%s\r\n", channel, l->buf + offset);
-        printf("\x1b[35mprivmsg #%s :%s\x1b[0m\r\n", channel, l->buf + offset);
+		raw("PRIVMSG #%s :%s\r\n", channel, l->buf + offset);
+		if (default_chan == 1) {
+			printf("\x1b[32;1m<%s>\x1b[0m %s\r\n", nick, l->buf + offset);
+			return;
+		}
+        printf("\x1b[32;1m<%s>\x1b[0m [\x1b[33m#%s\x1b[0m] %s\x1b[0m\r\n", nick, channel, l->buf + offset);
     }
     else {
+		// TODO: here
         raw("PRIVMSG %s :%s\r\n", channel, l->buf + offset);
         printf("\x1b[35mprivmsg %s :%s\x1b[0m\r\n", channel, l->buf + offset);
     }
@@ -1633,7 +1644,7 @@ static inline void chan_privmsg_command(state l)
     }
 }
 
-static void handle_user_input(state l)
+static void handle_user_input(state l, const char *nick)
 {
     if (*l->buf == '\0') {
         return;
@@ -1649,7 +1660,7 @@ static void handle_user_input(state l)
         return;
     }
     if (l->chan_privmsg) {
-        chan_privmsg(l, chan, 0);
+        chan_privmsg(l, chan, 0, nick, 0);
         return;
     }
     switch (l->buf[0]) {
@@ -1663,7 +1674,7 @@ static void handle_user_input(state l)
             return;
         }
         if (l->buf[1] == '/') {
-            chan_privmsg(l, chan, sizeof("//") - 1);
+            chan_privmsg(l, chan, sizeof("//") - 1, nick, 0);
             return;
         }
         if (!memcmp(l->buf + 1, "MSG", sizeof("MSG") - 1) || !memcmp(l->buf + 1, "msg", sizeof("msg") - 1)) {
@@ -1698,15 +1709,22 @@ static void handle_user_input(state l)
     case '@':           /* send private message to target channel or user */
         strtok_r(l->buf, " ", &tok);
         if (l->buf[1] != '@') {
-            raw("PRIVMSG %s :%s\r\n", l->buf + 1, tok);
-            printf("\x1b[35mprivmsg %s :%s\x1b[0m\r\n", l->buf + 1, tok);
+			raw("PRIVMSG %s :%s\r\n", l->buf + 1, tok);
+			// printf("\x1b[35mprivmsg %s :%s\x1b[0m\r\n", l->buf + 1, tok);
+			print_timestamp();
+			if (l->buf[1] == '#') {
+				printf("\x1b[32;1m<%s>\x1b[0m [\x1b[33m#%s\x1b[0m] %s\r\n", nick, l->buf + 2, tok);
+			}
+			else {
+				printf("\x1b[32;1m<%s>\x1b[0m \x1b[33;1m[PRIVMSG: <%s>]\x1b[32;1m %s\x1b[0m\r\n", nick, l->buf + 1, tok);
+			}
             return;
         }
         raw("PRIVMSG %s :\001ACTION %s\001\r\n", l->buf + 2, tok);
         printf("\x1b[35mprivmsg %s :ACTION %s\x1b[0m\r\n", l->buf + 2, tok);
         return;
     default:           /*  send private message to default channel */
-        chan_privmsg(l, chan, 0);
+        chan_privmsg(l, chan, 0, nick, 1);
         return;
     }
 }
@@ -1925,7 +1943,7 @@ int main(int argc, char **argv)
             editReturnFlag = edit(&l);
             if (editReturnFlag > 0) {
                 history_add(l.buf);
-                handle_user_input(&l);
+                handle_user_input(&l, nick);
                 state_reset(&l);
             } else if (editReturnFlag < 0) {
                 puts("\r\n");
