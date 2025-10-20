@@ -695,21 +695,26 @@ static int connection_initialize(void)
     return 0;
 }
 
-static void message_wrap(param p)
+static void message_wrap(param p, const char *nick)
 {
     if (!p->message) {
         return;
     }
+	char color[8];
+	color[0] = '\0';
+	if (strstr(p->message, nick) != NULL) {
+		strcpy(color, "\x1b[36;1m");
+	}
     char *tok;
 	size_t spaceleft = p->maxcols - (9 + strlen(p->nickname) + p->offset);
     for (tok = strtok(p->message, " "); tok != NULL; tok = strtok(NULL, " ")) {
         size_t wordwidth, spacewidth = 1;
         wordwidth = strnlen(tok, MSG_MAX);
         if ((wordwidth + spacewidth) > spaceleft) {
-            printf("\r\n%*.s%s ", (int)(9 + strlen(p->nickname)), " ", tok);
+            printf("\r\n%s%*.s%s ", color, (int)(9 + strlen(p->nickname)), " ", tok);
             spaceleft = p->maxcols - (9 + strlen(p->nickname));
         } else {
-            printf("%s ", tok);
+            printf("%s%s ", color, tok);
         }
         spaceleft -= wordwidth + spacewidth;
     }
@@ -1086,7 +1091,7 @@ static void param_print_private(param p)
 	}
     if (p->channel != NULL && (strcmp(p->channel, nick) == 0)) {
         handle_ctcp(p);
-        printf("\x1b[33;1m<%s> [PRIVMSG]\x1b[36m ", p->nickname);
+        printf("\x1b[33;1m<%s> [PRIVMSG]\x1b[36;1m ", p->nickname);
         p->offset += sizeof(" [PRIVMSG]");
     } else if (p->channel != NULL && strcmp(p->channel + 1, chan)) {
         printf("\x1b[33;1m<%s>\x1b[0m", p->nickname);
@@ -1194,12 +1199,12 @@ static void raw_parser(char *string)
     }if ((!memcmp(p.command, "PRIVMSG", sizeof("PRIVMSG") - 1)) || (!memcmp(p.command, "NOTICE", sizeof("NOTICE") - 1))) {
         filter_colors(p.message); /* this can be slow if -f is passed to kirc */
         param_print_private(&p);
-        message_wrap(&p);
+        message_wrap(&p, nick);
         printf("\x1b[0m\r\n");
         return;
     }
     param_print_channel(&p);
-    message_wrap(&p);
+    message_wrap(&p, nick);
     printf("\x1b[0m\r\n");
 }
 
@@ -1278,6 +1283,7 @@ static inline void part_command(state l)
 static inline void msg_command(state l)
 {
     char *tok;
+	print_timestamp();
     strtok_r(l->buf + sizeof("msg"), " ", &tok);
     int offset = 0;
     while (*(l->buf + sizeof("msg") + offset) == ' ') {
@@ -1285,7 +1291,7 @@ static inline void msg_command(state l)
     }
     raw("PRIVMSG %s :%s\r\n", l->buf + sizeof("msg") + offset, tok);
     if (memcmp(l->buf + sizeof("msg") + offset, "NickServ", sizeof("NickServ") - 1)) {
-		printf("\x1b[32m<%s>\x1b[0m \x1b[33;1m[PRIVMSG: %s]\x1b[32;1m %s\x1b[0m\r\n", nick, l->buf + sizeof("msg") + offset, tok);
+		printf("\x1b[31m<%s>\x1b[0m \x1b[33;1m[PRIVMSG: %s]\x1b[32;1m %s\x1b[0m\r\n", nick, l->buf + sizeof("msg") + offset, tok);
     }
 }
 
@@ -1298,7 +1304,7 @@ static inline void action_command(state l, const char *nick)
 
 	print_timestamp();
     raw("PRIVMSG #%s :\001ACTION %s\001\r\n", chan, l->buf + sizeof("action") + offset);
-	printf(" \x1b[32m* %s\x1b[0m %s\n", nick, l->buf + sizeof("action") + offset);
+	printf(" \x1b[31m* %s\x1b[0m %s\n", nick, l->buf + sizeof("action") + offset);
 }
 
 static inline void query_command(state l)
@@ -1607,14 +1613,14 @@ static inline void chan_privmsg(state l, char *channel, int offset, const char *
     if(l->nick_privmsg == 0) {
 		raw("PRIVMSG #%s :%s\r\n", channel, l->buf + offset);
 		if (default_chan == 1) {
-			printf("\x1b[32m<%s>\x1b[0m %s\r\n", nick, l->buf + offset);
+			printf("\x1b[31m<%s>\x1b[0m %s\r\n", nick, l->buf + offset);
 			return;
 		}
-        printf("\x1b[32m<%s>\x1b[0m [\x1b[33m#%s\x1b[0m] %s\x1b[0m\r\n", nick, channel, l->buf + offset);
+        printf("\x1b[31m<%s>\x1b[0m [\x1b[33m#%s\x1b[0m] %s\x1b[0m\r\n", nick, channel, l->buf + offset);
     }
     else {
         raw("PRIVMSG %s :%s\r\n", channel, l->buf + offset);
-		printf("\x1b[32m<%s>\x1b[0m \x1b[33;1m[PRIVMSG: %s]\x1b[32;1m %s\x1b[0m\r\n", nick, channel, l->buf + offset);
+		printf("\x1b[31m<%s>\x1b[0m \x1b[33;1m[PRIVMSG: %s]\x1b[32;1m %s\x1b[0m\r\n", nick, channel, l->buf + offset);
     }
 }
 
@@ -1689,7 +1695,6 @@ static void handle_user_input(state l, const char *nick)
             return;
         }
         raw("%s\r\n", l->buf + 1);
-        printf("\x1b[35m%s\x1b[0m\r\n", l->buf);
         return;
     case '@':           /* send private message to target channel or user */
         strtok_r(l->buf, " ", &tok);
@@ -1697,15 +1702,15 @@ static void handle_user_input(state l, const char *nick)
 			raw("PRIVMSG %s :%s\r\n", l->buf + 1, tok);
 			print_timestamp();
 			if (l->buf[1] == '#') {
-				printf("\x1b[32m<%s>\x1b[0m [\x1b[33m#%s\x1b[0m] %s\r\n", nick, l->buf + 2, tok);
+				printf("\x1b[31m<%s>\x1b[0m [\x1b[33m#%s\x1b[0m] %s\r\n", nick, l->buf + 2, tok);
 			}
 			else {
-				printf("\x1b[32m<%s>\x1b[0m \x1b[33;1m[PRIVMSG: %s]\x1b[32;1m %s\x1b[0m\r\n", nick, l->buf + 1, tok);
+				printf("\x1b[31m<%s>\x1b[0m \x1b[33;1m[PRIVMSG: %s]\x1b[32;1m %s\x1b[0m\r\n", nick, l->buf + 1, tok);
 			}
             return;
         }
         raw("PRIVMSG %s :\001ACTION %s\001\r\n", l->buf + 2, tok);
-        printf("\x1b[35mprivmsg %s :ACTION %s\x1b[0m\r\n", l->buf + 2, tok);
+        printf("\x1b[35mprivmsg %s: ACTION %s\x1b[0m\r\n", l->buf + 2, tok);
         return;
     default:           /*  send private message to default channel */
         chan_privmsg(l, chan, 0, nick, 1);
