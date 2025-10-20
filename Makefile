@@ -3,7 +3,7 @@ ALL_WARNING = -Wall -Werror -Wextra -Wno-unused-result -pedantic -std=c99
 PREFIX ?= /usr/local
 BINDIR = $(PREFIX)/bin
 MANDIR = $(PREFIX)/share/man
-CFLAGS = -march=native -O3 -pipe
+CFLAGS = -march=native -O2 -pipe
 # CFLAGS = -march=native -O0 -pipe -g3
 # CFLAGS += -fsanitize=address
 

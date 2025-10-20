@@ -598,6 +598,53 @@ static char *ctime_now(char *buf)
     return buf;
 }
 
+static inline void fast_itoa(int value, char *str) {
+    char *ptr;
+	char tmp;
+
+	ptr = str;
+	while (value > 0) {
+		*ptr = (value % 10) + 48;
+		value /= 10;
+		ptr++;
+	}
+    *ptr = '\0';
+	for (char *a = str, *b = ptr - 1; a < b; a++, b--) {
+		tmp = *a;
+		*a = *b;
+		*b = tmp;
+	}
+}
+
+static inline int hash(const char* str) {
+	int hash = 1760977460;
+	char *ptr;
+	ptr = (char*)str;
+	while (*ptr != '\0') {
+		hash = (hash << 5) | (hash >> 27);
+		hash ^= *ptr;
+		hash *= 0x27220a95;
+		ptr++;
+	}
+	return (abs(hash) % 14) + 1;
+}
+
+static inline void set_color(char* cbuf, const char *str) {
+	char buf[3] = "";
+	int c = hash(str);
+
+	if (c < 8) {
+		c += 30;
+	}
+	else {
+		c += 90 - 7;
+	}
+	strcpy(cbuf, "\x1b[");
+	fast_itoa(c, buf);
+	strcat(cbuf, buf);
+	strcat(cbuf, "m");
+}
+
 static void print_error(char *fmt, ...)
 {
     va_list ap;
@@ -722,28 +769,43 @@ static void message_wrap(param p, const char *nick)
 
 static inline void param_print_nick(param p)
 {
-    printf("\x1b[35;1m%*s\x1b[0m ", p->nicklen - 4, p->nickname);
-    printf("--> \x1b[35;1m%s\x1b[0m", p->message);
+	char color[6];
+
+	set_color(color, p->nickname);
+    printf("%s%*s\x1b[0m ", color, p->nicklen - 4, p->nickname);
+	set_color(color, p->message);
+    printf("--> %s%s\x1b[0m", color, p->message);
 }
 
 static void param_print_part(param p)
 {
-    printf("%*s<-- \x1b[34;1m%s\x1b[0m", p->nicklen - 3, "", p->nickname);
+	char color[6];
+
+	set_color(color, p->nickname);
+    printf("%*s<-- %s%s\x1b[0m", p->nicklen - 3, "", color, p->nickname);
     if (p->channel != NULL && strcmp(p->channel + 1, chan)) {
-        printf(" [\x1b[33m%s\x1b[0m] ", p->channel);
+		set_color(color, p->channel + 1);
+        printf(" [%s%s\x1b[0m] ", color, p->channel);
     }
 }
 
 static inline void param_print_quit(param p)
 {
-    printf("%*s<<< \x1b[34;1m%s\x1b[0m", p->nicklen - 3, "", p->nickname);
+	char color[6];
+
+	set_color(color, p->nickname);
+    printf("%*s<<< %s%s\x1b[0m", p->nicklen - 3, "", color, p->nickname);
 }
 
 static void param_print_join(param p)
 {
-    printf("%*s--> \x1b[32;1m%s\x1b[0m", p->nicklen - 3, "", p->nickname);
+	char color[6];
+
+	set_color(color, p->nickname);
+    printf("%*s--> %s%s\x1b[0m", p->nicklen - 3, "", color, p->nickname);
     if (p->channel != NULL && strcmp(p->channel + 1, chan)) {
-        printf(" [\x1b[33m%s\x1b[0m] ", p->channel);
+		set_color(color, p->channel + 1);
+        printf(" [%s%s\x1b[0m] ", color, p->channel);
     }
 }
 
@@ -1061,7 +1123,7 @@ static void filter_colors(char *string)
     return;
 }
 
-static void print_timestamp(void)
+static inline void print_timestamp(void)
 {
     time_t rawtime;
     struct tm *timeinfo;
@@ -1085,33 +1147,40 @@ static void print_timestamp(void)
 
 static void param_print_private(param p)
 {
+	char color[6];
+
+	set_color(color, p->nickname);
 	print_timestamp();
 	if (strnlen(p->nickname, p->nicklen) > (size_t)p->nicklen - 8) {
 		*(p->nickname + p->nicklen - 8) = '\0';
 	}
     if (p->channel != NULL && (strcmp(p->channel, nick) == 0)) {
         handle_ctcp(p);
-        printf("\x1b[33;1m<%s> [PRIVMSG]\x1b[36;1m ", p->nickname);
+        printf("%s<%s> \x1b[33;1m[PRIVMSG]\x1b[36;1m ", color, p->nickname);
         p->offset += sizeof(" [PRIVMSG]");
     } else if (p->channel != NULL && strcmp(p->channel + 1, chan)) {
-        printf("\x1b[33;1m<%s>\x1b[0m", p->nickname);
-        printf(" [\x1b[33m%s\x1b[0m] ", p->channel);
+        printf("%s<%s>\x1b[0m", color, p->nickname);
+		set_color(color, p->channel + 1);
+        printf(" [%s%s\x1b[0m] ", color, p->channel);
         p->offset += 12 + strnlen(p->channel, CHA_MAX);
     } else {
 		if (!memcmp(p->message, "\x01" "ACTION", sizeof("\x01" "ACTION") - 1)) {
 			p->message += sizeof("ACTION");
 			p->offset += sizeof(" \x1b[33;1m* ");
-			printf(" \x1b[33;1m* %s\x1b[0m ", p->nickname);
+			printf(" %s* %s\x1b[0m ", color, p->nickname);
 		}
 		else {
-			printf("\x1b[33;1m<%s>\x1b[0m ", p->nickname);
+			printf("%s<%s>\x1b[0m ", color, p->nickname);
 		}
     }
 }
 
 static void param_print_channel(param p)
 {
-    printf("      \x1b[33;1m%s\x1b[0m ", p->nickname);
+	char color[6];
+
+	set_color(color, p->nickname);
+    printf("      %s%s\x1b[0m ", color, p->nickname);
     if (p->params) {
         printf("%s", p->params);
         p->offset += strnlen(p->params, CHA_MAX);
@@ -1282,6 +1351,7 @@ static inline void part_command(state l)
 
 static inline void msg_command(state l)
 {
+	char color[6];
     char *tok;
 	print_timestamp();
     strtok_r(l->buf + sizeof("msg"), " ", &tok);
@@ -1291,7 +1361,8 @@ static inline void msg_command(state l)
     }
     raw("PRIVMSG %s :%s\r\n", l->buf + sizeof("msg") + offset, tok);
     if (memcmp(l->buf + sizeof("msg") + offset, "NickServ", sizeof("NickServ") - 1)) {
-		printf("\x1b[31m<%s>\x1b[0m \x1b[33;1m[PRIVMSG: %s]\x1b[32;1m %s\x1b[0m\r\n", nick, l->buf + sizeof("msg") + offset, tok);
+		set_color(color, l->buf + sizeof("msg") + offset);
+		printf("\x1b[33m<%s>\x1b[0m \x1b[33;1m[PRIVMSG:\x1b[0m %s%s\x1b[33;1m] \x1b[32;1m%s\x1b[0m\r\n", nick, color, l->buf + sizeof("msg") + offset, tok);
     }
 }
 
@@ -1304,7 +1375,7 @@ static inline void action_command(state l, const char *nick)
 
 	print_timestamp();
     raw("PRIVMSG #%s :\001ACTION %s\001\r\n", chan, l->buf + sizeof("action") + offset);
-	printf(" \x1b[31m* %s\x1b[0m %s\n", nick, l->buf + sizeof("action") + offset);
+	printf(" \x1b[33m* %s\x1b[0m %s\n", nick, l->buf + sizeof("action") + offset);
 }
 
 static inline void query_command(state l)
@@ -1609,18 +1680,23 @@ close_fd:
 
 static inline void chan_privmsg(state l, char *channel, int offset, const char *nick, char default_chan)
 {
+
+	char color[6];
+
 	print_timestamp();
     if(l->nick_privmsg == 0) {
 		raw("PRIVMSG #%s :%s\r\n", channel, l->buf + offset);
 		if (default_chan == 1) {
-			printf("\x1b[31m<%s>\x1b[0m %s\r\n", nick, l->buf + offset);
+			printf("\x1b[33m<%s>\x1b[0m %s\r\n", nick, l->buf + offset);
 			return;
 		}
-        printf("\x1b[31m<%s>\x1b[0m [\x1b[33m#%s\x1b[0m] %s\x1b[0m\r\n", nick, channel, l->buf + offset);
+		set_color(color, channel);
+        printf("\x1b[33m<%s>\x1b[0m [%s#%s\x1b[0m] %s\x1b[0m\r\n", nick, color, channel, l->buf + offset);
     }
     else {
         raw("PRIVMSG %s :%s\r\n", channel, l->buf + offset);
-		printf("\x1b[31m<%s>\x1b[0m \x1b[33;1m[PRIVMSG: %s]\x1b[32;1m %s\x1b[0m\r\n", nick, channel, l->buf + offset);
+		set_color(color, channel);
+		printf("\x1b[33m<%s>\x1b[0m \x1b[33;1m[PRIVMSG:\x1b[0m %s%s\x1b[33;1m]\x1b[32;1m %s\x1b[0m\r\n", nick, color, channel, l->buf + offset);
     }
 }
 
@@ -1642,6 +1718,7 @@ static void handle_user_input(state l, const char *nick)
         return;
     }
     char *tok;
+	char color[6];
     size_t msg_len = strnlen(l->buf, MSG_MAX);
     if (msg_len > 0 && l->buf[msg_len - 1] == '\n') {
         l->buf[msg_len - 1] = '\0';
@@ -1702,10 +1779,12 @@ static void handle_user_input(state l, const char *nick)
 			raw("PRIVMSG %s :%s\r\n", l->buf + 1, tok);
 			print_timestamp();
 			if (l->buf[1] == '#') {
-				printf("\x1b[31m<%s>\x1b[0m [\x1b[33m#%s\x1b[0m] %s\r\n", nick, l->buf + 2, tok);
+				set_color(color, l->buf + 2);
+				printf("\x1b[33m<%s>\x1b[0m [%s#%s\x1b[0m] %s\r\n", nick, color, l->buf + 2, tok);
 			}
 			else {
-				printf("\x1b[31m<%s>\x1b[0m \x1b[33;1m[PRIVMSG: %s]\x1b[32;1m %s\x1b[0m\r\n", nick, l->buf + 1, tok);
+				set_color(color, l->buf + 1);
+				printf("\x1b[33m<%s>\x1b[0m \x1b[33;1m[PRIVMSG:\x1b[0m %s%s\x1b[33;1m] \x1b[32;1m%s\x1b[0m\r\n", nick, color, l->buf + 1, tok);
 			}
             return;
         }
