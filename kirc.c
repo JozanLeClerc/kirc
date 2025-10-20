@@ -701,13 +701,14 @@ static void message_wrap(param p)
         return;
     }
     char *tok;
-    size_t spaceleft = p->maxcols - (p->nicklen + p->offset);
+	// size_t spaceleft = p->maxcols - (p->nicklen + p->offset);
+	size_t spaceleft = p->maxcols - (9 + strnlen(p->nickname, p->nicklen));
     for (tok = strtok(p->message, " "); tok != NULL; tok = strtok(NULL, " ")) {
         size_t wordwidth, spacewidth = 1;
         wordwidth = strnlen(tok, MSG_MAX);
         if ((wordwidth + spacewidth) > spaceleft) {
-            printf("\r\n%*.s%s ", (int)p->nicklen + 1, " ", tok);
-            spaceleft = p->maxcols - (p->nicklen + 1);
+            printf("\r\n%*.s%s ", (int)(9 + strnlen(p->nickname, p->nicklen)), " ", tok);
+            spaceleft = p->maxcols - (9 + strnlen(p->nickname, p->nicklen));
         } else {
             printf("%s ", tok);
         }
@@ -1086,28 +1087,27 @@ static void param_print_private(param p)
 	}
     if (p->channel != NULL && (strcmp(p->channel, nick) == 0)) {
         handle_ctcp(p);
-        printf("\x1b[33;1m<%-.*s> [PRIVMSG]\x1b[36m ", p->nicklen, p->nickname);
+        printf("\x1b[33;1m<%s> [PRIVMSG]\x1b[36m ", p->nickname);
         p->offset += sizeof(" [PRIVMSG]");
     } else if (p->channel != NULL && strcmp(p->channel + 1, chan)) {
-        printf("\x1b[33;1m<%-.*s>\x1b[0m", p->nicklen, p->nickname);
+        printf("\x1b[33;1m<%s>\x1b[0m", p->nickname);
         printf(" [\x1b[33m%s\x1b[0m] ", p->channel);
         p->offset += 12 + strnlen(p->channel, CHA_MAX);
     } else {
 		if (!memcmp(p->message, "\x01" "ACTION", sizeof("\x01" "ACTION") - 1)) {
 			p->message += sizeof("ACTION");
 			p->offset += sizeof(" \x1b[33;1m* ");
-			printf(" \x1b[33;1m* ");
-			printf("\x1b[33;1m%-.*s\x1b[0m ", p->nicklen, p->nickname);
+			printf(" \x1b[33;1m* %s\x1b[0m ", p->nickname);
 		}
 		else {
-			printf("\x1b[33;1m<%-.*s>\x1b[0m ", p->nicklen, p->nickname);
+			printf("\x1b[33;1m<%s>\x1b[0m ", p->nickname);
 		}
     }
 }
 
 static void param_print_channel(param p)
 {
-    printf("      \x1b[33;1m%-.*s\x1b[0m ", p->nicklen, p->nickname);
+    printf("      \x1b[33;1m%s\x1b[0m ", p->nickname);
     if (p->params) {
         printf("%s", p->params);
         p->offset += strnlen(p->params, CHA_MAX);
@@ -1620,10 +1620,10 @@ static inline void chan_privmsg(state l, char *channel, int offset, const char *
     if(l->nick_privmsg == 0) {
 		raw("PRIVMSG #%s :%s\r\n", channel, l->buf + offset);
 		if (default_chan == 1) {
-			printf("\x1b[32;1m<%s>\x1b[0m %s\r\n", nick, l->buf + offset);
+			printf("\x1b[32m<%s>\x1b[0m %s\r\n", nick, l->buf + offset);
 			return;
 		}
-        printf("\x1b[32;1m<%s>\x1b[0m [\x1b[33m#%s\x1b[0m] %s\x1b[0m\r\n", nick, channel, l->buf + offset);
+        printf("\x1b[32m<%s>\x1b[0m [\x1b[33m#%s\x1b[0m] %s\x1b[0m\r\n", nick, channel, l->buf + offset);
     }
     else {
 		// TODO: here
@@ -1713,10 +1713,10 @@ static void handle_user_input(state l, const char *nick)
 			// printf("\x1b[35mprivmsg %s :%s\x1b[0m\r\n", l->buf + 1, tok);
 			print_timestamp();
 			if (l->buf[1] == '#') {
-				printf("\x1b[32;1m<%s>\x1b[0m [\x1b[33m#%s\x1b[0m] %s\r\n", nick, l->buf + 2, tok);
+				printf("\x1b[32m<%s>\x1b[0m [\x1b[33m#%s\x1b[0m] %s\r\n", nick, l->buf + 2, tok);
 			}
 			else {
-				printf("\x1b[32;1m<%s>\x1b[0m \x1b[33;1m[PRIVMSG: <%s>]\x1b[32;1m %s\x1b[0m\r\n", nick, l->buf + 1, tok);
+				printf("\x1b[32m<%s>\x1b[0m \x1b[33;1m[PRIVMSG: <%s>]\x1b[32;1m %s\x1b[0m\r\n", nick, l->buf + 1, tok);
 			}
             return;
         }

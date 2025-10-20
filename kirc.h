@@ -12,7 +12,7 @@
 #define TESTCHARS "\xe1\xbb\xa4"
 #define MSG_MAX 512 /* irc rfc says lines are 512 char's max, but servers can accept more */
 #define CHA_MAX 200
-#define WRAP_LEN 26
+#define WRAP_LEN 22
 #define ABUF_LEN (sizeof("\r") - 1 + CHA_MAX + sizeof("> ") - 1 + MSG_MAX + sizeof("\x1b[0K") - 1 + 32 + 1)
                                                               /* this is as big as the ab buffer can get */
 #define HIS_MAX 100
