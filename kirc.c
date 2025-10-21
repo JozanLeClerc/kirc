@@ -485,9 +485,10 @@ static int edit(state l)
     }
     char seq[3];
     switch (c) {
+	case 10:
     case 13:
         edit_enter();
-        return 1;           /* enter */
+        return 1;           /* enter */ /* ctrl+j */
     case 3:
         errno = EAGAIN;
         return -1;          /* ctrl-c */
@@ -535,7 +536,7 @@ static int edit(state l)
                 history_len = HIS_MAX - 1;
                 history_wrap = 0;
             }
-            return -1;
+            return 0;
         }
         edit_delete(l);
         return 0;
@@ -750,7 +751,7 @@ static int connection_initialize(void)
     return 0;
 }
 
-static void message_wrap(param p, const char *nick)
+static void message_wrap(param p)
 {
     if (!p->message) {
         return;
@@ -1276,12 +1277,12 @@ static void raw_parser(char *string)
     }if ((!memcmp(p.command, "PRIVMSG", sizeof("PRIVMSG") - 1)) || (!memcmp(p.command, "NOTICE", sizeof("NOTICE") - 1))) {
         filter_colors(p.message); /* this can be slow if -f is passed to kirc */
         param_print_private(&p);
-        message_wrap(&p, nick);
+        message_wrap(&p);
         printf("\x1b[0m\r\n");
         return;
     }
     param_print_channel(&p);
-    message_wrap(&p, nick);
+    message_wrap(&p);
     printf("\x1b[0m\r\n");
 }
 
@@ -1724,7 +1725,7 @@ static inline void chan_privmsg_command(state l)
     }
 }
 
-static void handle_user_input(state l, const char *nick)
+static void handle_user_input(state l)
 {
     if (*l->buf == '\0') {
         return;
@@ -2024,7 +2025,7 @@ int main(int argc, char **argv)
             editReturnFlag = edit(&l);
             if (editReturnFlag > 0) {
                 history_add(l.buf);
-                handle_user_input(&l, nick);
+                handle_user_input(&l);
                 state_reset(&l);
             } else if (editReturnFlag < 0) {
                 puts("\r\n");
