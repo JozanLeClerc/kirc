@@ -1351,7 +1351,7 @@ static inline void part_command(state l)
 
 static inline void msg_command(state l)
 {
-	char color[6];
+	char color[2][6];
     char *tok;
 	print_timestamp();
     strtok_r(l->buf + sizeof("msg"), " ", &tok);
@@ -1361,21 +1361,24 @@ static inline void msg_command(state l)
     }
     raw("PRIVMSG %s :%s\r\n", l->buf + sizeof("msg") + offset, tok);
     if (memcmp(l->buf + sizeof("msg") + offset, "NickServ", sizeof("NickServ") - 1)) {
-		set_color(color, l->buf + sizeof("msg") + offset);
-		printf("\x1b[33m<%s>\x1b[0m \x1b[33;1m[PRIVMSG:\x1b[0m %s%s\x1b[33;1m] \x1b[32;1m%s\x1b[0m\r\n", nick, color, l->buf + sizeof("msg") + offset, tok);
+		set_color(color[0], nick);
+		set_color(color[1], l->buf + sizeof("msg") + offset);
+		printf("%s<%s>\x1b[0m \x1b[33;1m[PRIVMSG:\x1b[0m %s%s\x1b[33;1m] \x1b[32;1m%s\x1b[0m\r\n", color[0], nick, color[1], l->buf + sizeof("msg") + offset, tok);
     }
 }
 
 static inline void action_command(state l, const char *nick)
 {
+	char color[6];
     int offset = 0;
     while (*(l->buf + sizeof("action") + offset) == ' ') {
         offset ++;
     }
 
+	set_color(color, nick);
 	print_timestamp();
     raw("PRIVMSG #%s :\001ACTION %s\001\r\n", chan, l->buf + sizeof("action") + offset);
-	printf(" \x1b[33m* %s\x1b[0m %s\n", nick, l->buf + sizeof("action") + offset);
+	printf(" %s* %s\x1b[0m %s\n", color, nick, l->buf + sizeof("action") + offset);
 }
 
 static inline void query_command(state l)
@@ -1681,22 +1684,23 @@ close_fd:
 static inline void chan_privmsg(state l, char *channel, int offset, const char *nick, char default_chan)
 {
 
-	char color[6];
+	char color[2][6];
 
 	print_timestamp();
+	set_color(color[0], nick);
     if(l->nick_privmsg == 0) {
 		raw("PRIVMSG #%s :%s\r\n", channel, l->buf + offset);
 		if (default_chan == 1) {
-			printf("\x1b[33m<%s>\x1b[0m %s\r\n", nick, l->buf + offset);
+			printf("%s<%s>\x1b[0m %s\r\n", color[0], nick, l->buf + offset);
 			return;
 		}
-		set_color(color, channel);
-        printf("\x1b[33m<%s>\x1b[0m [%s#%s\x1b[0m] %s\x1b[0m\r\n", nick, color, channel, l->buf + offset);
+		set_color(color[1], channel);
+        printf("%s<%s>\x1b[0m [%s#%s\x1b[0m] %s\x1b[0m\r\n", color[0], nick, color[1], channel, l->buf + offset);
     }
     else {
         raw("PRIVMSG %s :%s\r\n", channel, l->buf + offset);
-		set_color(color, channel);
-		printf("\x1b[33m<%s>\x1b[0m \x1b[33;1m[PRIVMSG:\x1b[0m %s%s\x1b[33;1m]\x1b[32;1m %s\x1b[0m\r\n", nick, color, channel, l->buf + offset);
+		set_color(color[1], channel);
+		printf("%s<%s>\x1b[0m \x1b[33;1m[PRIVMSG:\x1b[0m %s%s\x1b[33;1m]\x1b[32;1m %s\x1b[0m\r\n", color[0], nick, color[1], channel, l->buf + offset);
     }
 }
 
@@ -1718,7 +1722,7 @@ static void handle_user_input(state l, const char *nick)
         return;
     }
     char *tok;
-	char color[6];
+	char color[2][6];
     size_t msg_len = strnlen(l->buf, MSG_MAX);
     if (msg_len > 0 && l->buf[msg_len - 1] == '\n') {
         l->buf[msg_len - 1] = '\0';
@@ -1778,13 +1782,14 @@ static void handle_user_input(state l, const char *nick)
         if (l->buf[1] != '@') {
 			raw("PRIVMSG %s :%s\r\n", l->buf + 1, tok);
 			print_timestamp();
+			set_color(color[0], nick);
 			if (l->buf[1] == '#') {
-				set_color(color, l->buf + 2);
-				printf("\x1b[33m<%s>\x1b[0m [%s#%s\x1b[0m] %s\r\n", nick, color, l->buf + 2, tok);
+				set_color(color[1], l->buf + 2);
+				printf("%s<%s>\x1b[0m [%s#%s\x1b[0m] %s\r\n", color[0], nick, color[1], l->buf + 2, tok);
 			}
 			else {
-				set_color(color, l->buf + 1);
-				printf("\x1b[33m<%s>\x1b[0m \x1b[33;1m[PRIVMSG:\x1b[0m %s%s\x1b[33;1m] \x1b[32;1m%s\x1b[0m\r\n", nick, color, l->buf + 1, tok);
+				set_color(color[1], l->buf + 1);
+				printf("%s<%s>\x1b[0m \x1b[33;1m[PRIVMSG:\x1b[0m %s%s\x1b[33;1m] \x1b[32;1m%s\x1b[0m\r\n", color[0], nick, color[1], l->buf + 1, tok);
 			}
             return;
         }
