@@ -598,21 +598,29 @@ static char *ctime_now(char *buf)
     return buf;
 }
 
-static inline void fast_itoa(int value, char *str) {
-    char *ptr;
+static inline void fast_itoa(int value, char *str, size_t size) {
 	char tmp;
+	int len;
 
-	ptr = str;
-	while (value > 0) {
-		*ptr = (value % 10) + 48;
-		value /= 10;
-		ptr++;
+	if (size == 0) {
+		return;
 	}
-    *ptr = '\0';
-	for (char *a = str, *b = ptr - 1; a < b; a++, b--) {
-		tmp = *a;
-		*a = *b;
-		*b = tmp;
+	if (value == 0) {
+        str[0] = '0';
+        str[1] = '\0';
+        return;
+    }
+	len = 0;
+	while (value > 0 && len < (int)size - 1) {
+		str[len] = (value % 10) + 48;
+		value /= 10;
+		len++;
+	}
+    str[len] = '\0';
+	for (int i = 0; i < len / 2; i++) {
+		tmp = str[i];
+		str[i] = str[len - 1 - i];
+		str[len - 1 - i] = tmp;
 	}
 }
 
@@ -640,7 +648,7 @@ static inline void set_color(char* cbuf, const char *str) {
 		c += 90 - 7;
 	}
 	strcpy(cbuf, "\x1b[");
-	fast_itoa(c, buf);
+	fast_itoa(c, buf, sizeof(buf));
 	strcat(cbuf, buf);
 	strcat(cbuf, "m");
 }
