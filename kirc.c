@@ -595,6 +595,13 @@ static void lnicks_add(lnicks_t **head, const char *n)
 	if (n == NULL) {
 		return;
 	}
+	tmp = *head;
+	while (tmp != NULL) {
+		if (strcmp(n, tmp->nick) == 0) {
+			return;
+		}
+		tmp = tmp->next;
+	}
 	new = (lnicks_t*)malloc(sizeof(lnicks_t));
 	if (new == NULL) {
 		return;
@@ -2073,7 +2080,12 @@ int main(int argc, char **argv)
     memset(&l, 0, sizeof(l));
     state_reset(&l);
 	lnicks_t *lnicks = NULL;
-	lnicks_add(&lnicks, NULL);
+	lnicks_add(&lnicks, "jozan");
+	lnicks_add(&lnicks, "jozan");
+	lnicks_add(&lnicks, "joe");
+	lnicks_add(&lnicks, "qwe");
+	lnicks_add(&lnicks, "joe");
+	lnicks_add(&lnicks, "joeqwe");
 	debug_lnicks_print(lnicks);
     int rc, editReturnFlag = 0;
     if (enable_raw_mode(ttyinfd) == -1) {
