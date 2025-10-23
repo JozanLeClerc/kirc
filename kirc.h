@@ -147,4 +147,9 @@ static struct {
     struct dcc_connection slots[CON_MAX];
 } dcc_sessions = {0};
 
+typedef struct LNICKS {
+	char nick[WRAP_LEN];
+	struct LNICKS* next;
+} lnicks_t, *lnicks;
+
 #endif

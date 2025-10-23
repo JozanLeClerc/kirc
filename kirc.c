@@ -588,6 +588,72 @@ static inline void state_reset(state l)
     history_add("");
 }
 
+static void lnicks_add(lnicks_t **head, const char *n)
+{
+	lnicks_t *tmp;
+	lnicks_t *new;
+	if (n == NULL) {
+		return;
+	}
+	new = (lnicks_t*)malloc(sizeof(lnicks_t));
+	if (new == NULL) {
+		return;
+	}
+	if (strlen(n) < WRAP_LEN) {
+		strcpy(new->nick, n);
+	}
+	else {
+		memcpy(new->nick, n, WRAP_LEN);
+		new->nick[WRAP_LEN - 1] = '\0';
+	}
+	new->next = NULL;
+	if (*head == NULL) {
+		*head = new;
+	}
+	else {
+		tmp = *head;
+		while (tmp->next != NULL) {
+			tmp = tmp->next;
+		}
+		tmp->next = new;
+	}
+}
+
+static void lnicks_clean(lnicks_t **head)
+{
+	lnicks_t *ptr;
+	lnicks_t *next;
+	ptr = *head;
+	if (head == NULL || ptr == NULL) {
+		return;
+	}
+	while (ptr != NULL) {
+		next = ptr->next;
+		free(ptr);
+		ptr = NULL;
+		ptr = next;
+	}
+	*head = NULL;
+}
+
+static void debug_lnicks_print(lnicks_t *lnicks)
+{
+	lnicks_t *ptr;
+	ptr = lnicks;
+	if (lnicks == NULL) {
+		return;
+	}
+	printf("[");
+	while (ptr != NULL) {
+		printf("%s", ptr->nick);
+		if (ptr->next != NULL) {
+			printf(" ");
+		}
+		ptr = ptr->next;
+	}
+	printf("]\r\n");
+}
+
 static char *ctime_now(char *buf)
 {
     struct tm tm_;
@@ -759,7 +825,7 @@ static void message_wrap(param p)
 	char color[8];
 	color[0] = '\0';
 	if (strstr(p->message, nick) != NULL) {
-		strcpy(color, "\x1b[36;1m");
+		strcpy(color, "\x1b[33;1m");
 	}
     char *tok;
 	size_t spaceleft = p->maxcols - (9 + strlen(p->nickname) + p->offset);
@@ -1175,7 +1241,7 @@ static void param_print_private(param p)
     } else {
 		if (!memcmp(p->message, "\x01" "ACTION", sizeof("\x01" "ACTION") - 1)) {
 			p->message += sizeof("ACTION");
-			p->offset += sizeof(" \x1b[33;1m* ");
+			p->offset += sizeof(" \x1b[33m* ");
 			printf(" %s* %s\x1b[0m ", color, p->nickname);
 		}
 		else {
@@ -2006,6 +2072,9 @@ int main(int argc, char **argv)
     state_t l;
     memset(&l, 0, sizeof(l));
     state_reset(&l);
+	lnicks_t *lnicks = NULL;
+	lnicks_add(&lnicks, NULL);
+	debug_lnicks_print(lnicks);
     int rc, editReturnFlag = 0;
     if (enable_raw_mode(ttyinfd) == -1) {
         return 1;
@@ -2029,6 +2098,7 @@ int main(int argc, char **argv)
                 state_reset(&l);
             } else if (editReturnFlag < 0) {
                 puts("\r\n");
+				lnicks_clean(&lnicks);
                 return 0;
             }
             refresh_line(&l);
@@ -2039,6 +2109,7 @@ int main(int argc, char **argv)
                 return 1;
             }
             if (rc != 0) {
+				lnicks_clean(&lnicks);
                 return 0;
             }
             refresh_line(&l);
