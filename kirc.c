@@ -311,6 +311,32 @@ static void edit_backspace(state l)
     refresh_line(l);
 }
 
+static void edit_fill_nick(state l)
+{
+	l->oldposb = l->posb;
+	memcpy(l->buf + l->posb, "FUCK", strlen("FUCK") + 1);
+	l->posb += 4;
+	l->posu8 += 4;
+	l->lenb += 4;
+	l->lenu8 += 4;
+    // while ((l->posb > 0) && (l->buf[l->posb - 1] == ' ')) {
+    //     l->posb--;
+    //     l->posu8--;
+    // }
+    // while ((l->posb > 0) && (l->buf[l->posb - 1] != ' ')) {
+    //     if (u8_character_start(l->buf[l->posb - 1])) {
+    //         l->posu8--;
+    //     }
+    //     l->posb--;
+    // }
+    // size_t diffb = old_posb - l->posb;
+    // size_t diffu8 = old_posu8 - l->posu8;
+    // buffer_position_move_end(l, 0, 5);
+    // l->lenb -= diffb;
+    // l->lenu8 -= diffu8;
+    refresh_line(l);
+}
+
 static void edit_delete_previous_word(state l)
 {
     size_t old_posb = l->posb;
@@ -508,6 +534,9 @@ static int edit(state l)
     case 5:
         edit_move_end(l);
         return 0;              /* ctrl+e */
+    case 9:
+		edit_fill_nick(l);
+        return 0;              /* ctrl+i */ /* tab */
     case 23:
         edit_delete_previous_word(l);
         return 0;              /* ctrl+w */
@@ -582,7 +611,7 @@ static inline void state_reset(state l)
         l->plenb = ptr - tok;
         l->plenu8 = u8_length(tok);
     }
-    l->oldposb = l->posb = l->oldposu8 = l->posu8 = l->lenb = l->lenu8 = 0;
+    l->oldposb = l->posb = l->oldposu8 = l->posu8 = l->lenb = l->lenu8 = l->nickposb = 0;
     l->history_index = 0;
     l->buf[0] = '\0';
     history_add("");
@@ -1401,21 +1430,27 @@ static int handle_server_message(void)
 
 static inline void join_command(state l)
 {
+	char color[6];
     if (!strchr(l->buf, '#')){
         printf("\x1b[35m%s: illegal channel!\x1b[0m\r\n", l->buf);
         return;
     }
     *stpncpy(chan, strchr(l->buf, '#') + 1, MSG_MAX - 1) = '\0';
     raw("JOIN #%s\r\n", chan);
+	set_color(color, chan);
+	printf("> %s#%s\x1b[0m\r\n", color, chan);
     l->nick_privmsg = 0;
 }
 
 static inline void part_command(state l)
 {
+	char color[6];
     char *tok;
     tok = strchr(l->buf, '#');
     if (tok){
         raw("PART %s\r\n", tok);
+		set_color(color, tok + 1);
+		printf("< %s%s\x1b[0m\r\n", color, tok);
         strcpy(chan, "");
         return;
     }
@@ -1425,6 +1460,8 @@ static inline void part_command(state l)
     }
     if (*tok == '#' || *tok == '\0') {
         raw("PART #%s\r\n", chan);
+		set_color(color, chan);
+		printf("< %s#%s\x1b[0m\r\n", color, chan);
         strcpy(chan, "");
         return;
     }
@@ -1458,8 +1495,8 @@ static inline void action_command(state l, const char *nick)
     }
 
 	set_color(color, nick);
-	print_timestamp();
     raw("PRIVMSG #%s :\001ACTION %s\001\r\n", chan, l->buf + sizeof("action") + offset);
+	print_timestamp();
 	printf(" %s* %s\x1b[0m %s\n", color, nick, l->buf + sizeof("action") + offset);
 }
 
@@ -1477,12 +1514,16 @@ static inline void query_command(state l)
 
 static inline void nick_command(state l)
 {
+	char color[2][6];
     char *tok;
     raw("%s\r\n", l->buf + 1);
     tok = l->buf + sizeof("nick");
     while (*tok == ' ') {
         tok++;
     }
+	set_color(color[0], nick);
+	set_color(color[1], tok);
+	printf("%s%s\x1b[0m > %s%s\x1b[0m\r\n", color[0], nick, color[1], tok);
     strcpy(nick, tok);
 }
 
@@ -1824,7 +1865,8 @@ static void handle_user_input(state l)
             join_command(l);
             return;
         }
-        if (!memcmp(l->buf + 1, "PART", sizeof("PART") - 1) || !memcmp(l->buf + 1, "part", sizeof("part") - 1)) {
+        if (!memcmp(l->buf + 1, "PART", sizeof("PART") - 1) || !memcmp(l->buf + 1, "part", sizeof("part") - 1) ||
+			!memcmp(l->buf + 1, "LEAVE", sizeof("LEAVE") - 1) || !memcmp(l->buf + 1, "leave", sizeof("leave") - 1)) {
             part_command(l);
             return;
         }
