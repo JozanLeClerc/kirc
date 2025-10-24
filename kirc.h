@@ -92,6 +92,11 @@ static int history_len = 0;
 static char history_wrap = 0;
 static char history[HIS_MAX][MSG_MAX];
 
+typedef struct LNICKS {
+	char nick[WRAP_LEN];
+	struct LNICKS* next;
+} lnicks_t, *lnicks;
+
 typedef struct PARAMETERS {
     char *prefix;
     char *suffix;
@@ -120,6 +125,7 @@ typedef struct STATE {
     int history_index;          /* Current line in the edit history */
     char nick_privmsg;          /* whether or not we are sending messages to a chan or nick */
     char chan_privmsg;          /* flag to toggle raw messages */
+	lnicks_t *nicks;            /* Pointer to the list of nicks */
 } state_t, *state;
 
 struct abuf {
@@ -147,10 +153,5 @@ static struct {
     struct pollfd sock_fds[CON_MAX + 2];
     struct dcc_connection slots[CON_MAX];
 } dcc_sessions = {0};
-
-typedef struct LNICKS {
-	char nick[WRAP_LEN];
-	struct LNICKS* next;
-} lnicks_t, *lnicks;
 
 #endif

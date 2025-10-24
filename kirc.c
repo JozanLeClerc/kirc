@@ -313,12 +313,21 @@ static void edit_backspace(state l)
 
 static void edit_fill_nick(state l)
 {
+	char *ptr;
+
+	if ((l->posb == 0) || (l->buf[l->posb - 1] == ' ')) {
+		return;
+	}
 	l->oldposb = l->posb;
-	memcpy(l->buf + l->posb, "FUCK", strlen("FUCK") + 1);
-	l->posb += 4;
-	l->posu8 += 4;
-	l->lenb += 4;
-	l->lenu8 += 4;
+	// memcpy(l->buf + l->posb, "FUCK", strlen("FUCK"));
+	// l->posb += 4;
+	// l->posu8 += 4;
+	// l->lenb += 4;
+	// l->lenu8 += 4;
+	ptr = l->buf + l->posb;
+	printf("\r\n[%c]\r\n", *ptr);
+	// while ((l->posb) > 0 && (l->buf[l->posb - 1] == ' ')) { /* rwnd */
+	// }
     // while ((l->posb > 0) && (l->buf[l->posb - 1] == ' ')) {
     //     l->posb--;
     //     l->posu8--;
@@ -672,11 +681,11 @@ static void lnicks_clean(lnicks_t **head)
 	*head = NULL;
 }
 
-static void debug_lnicks_print(lnicks_t *lnicks)
+static void debug_lnicks_print(lnicks ln)
 {
 	lnicks_t *ptr;
-	ptr = lnicks;
-	if (lnicks == NULL) {
+	ptr = ln;
+	if (ln == NULL) {
 		return;
 	}
 	printf("[");
@@ -1298,7 +1307,7 @@ static void param_print_channel(param p)
     }
 }
 
-static void raw_parser(char *string)
+static void raw_parser(char *string, lnicks ln)
 {
     if (!memcmp(string, "PING", sizeof("PING") - 1)) {
         string[1] = 'O';
@@ -1324,9 +1333,12 @@ static void raw_parser(char *string)
         .channel = strtok(NULL, " \r"),
         .params = strtok(NULL, ":\r"),
         .maxcols = get_columns(ttyinfd, STDOUT_FILENO),
-        .offset = 0
+        .offset = 0,
     };
 
+	/* TODO: change this and use 353 */
+	lnicks_add(&ln, p.nickname);
+	debug_lnicks_print(ln);
 	p.nicklen = WRAP_LEN;
     if (*chan != '\0' && !memcmp(p.command, "001", sizeof("001") - 1)) {
         static char not_first_time = 0;
@@ -1391,7 +1403,7 @@ static void raw_parser(char *string)
 static char message_buffer[MSG_MAX + 1];
 static size_t message_end = 0;
 
-static int handle_server_message(void)
+static int handle_server_message(lnicks ln)
 {
     for (;;) {
         ssize_t nread = read(conn, &message_buffer[message_end],
@@ -1415,7 +1427,7 @@ static int handle_server_message(void)
                 && message_buffer[i] == '\n') {
                 char saved_char = message_buffer[i + 1];
                 message_buffer[i + 1] = '\0';
-                raw_parser(message_buffer);
+                raw_parser(message_buffer, ln);
                 message_buffer[i + 1] = saved_char;
                 memmove(&message_buffer, &message_buffer[i + 1], message_end - i - 1);
                 message_end = message_end - i - 1;
@@ -2122,6 +2134,7 @@ int main(int argc, char **argv)
     memset(&l, 0, sizeof(l));
     state_reset(&l);
 	lnicks_t *lnicks = NULL;
+	l.nicks = lnicks;
 	lnicks_add(&lnicks, "jozan");
 	lnicks_add(&lnicks, "jozan");
 	lnicks_add(&lnicks, "joe");
@@ -2158,7 +2171,7 @@ int main(int argc, char **argv)
             refresh_line(&l);
         }
         if (dcc_sessions.sock_fds[CON_MAX + 1].revents & POLLIN) {
-            rc = handle_server_message();
+            rc = handle_server_message(lnicks);
             if (rc == -2) {
                 return 1;
             }
