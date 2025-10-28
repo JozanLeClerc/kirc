@@ -378,10 +378,10 @@ static void edit_fill_nick(state l)
 	}
 
 	size_t len_diff = strlen(found) - strlen(find);
-	memmove(l->buf + l->nickposb + len_diff + (l->nickposb - len == 0 ? 2 : 1),
-		 l->buf + l->nickposb,
-		 strlen(l->buf + l->nickposb) + 1);
-	memmove(l->buf + l->nickposb, found + strlen(find), len_diff);
+	memmove(l->buf + l->posb + len_diff + (l->nickposb - len == 0 ? 2 : 1),
+		 l->buf + l->posb,
+		 strlen(l->buf + l->posb) + 1);
+	memcpy(l->buf + l->nickposb - strlen(find), found, strlen(found));
 	if (l->nickposb - len == 0) {
 		memmove(l->buf + l->nickposb + len_diff, ": ", 2);
 		l->lenb  += len_diff + 2;
