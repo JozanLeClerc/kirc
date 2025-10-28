@@ -125,7 +125,7 @@ typedef struct STATE {
     int history_index;          /* Current line in the edit history */
     char nick_privmsg;          /* whether or not we are sending messages to a chan or nick */
     char chan_privmsg;          /* flag to toggle raw messages */
-	lnicks_t *nicks;            /* Pointer to the list of nicks */
+	lnicks_t **nicks;           /* Pointer to the list of nicks */
 } state_t, *state;
 
 struct abuf {

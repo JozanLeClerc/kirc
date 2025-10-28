@@ -35,6 +35,23 @@ static int enable_raw_mode(int fd)
     return -1;
 }
 
+static char *lnicks_find(lnicks_t *head, const char *s, int rounds) {
+	lnicks ptr;
+	int i;
+	ptr = head;
+	i = 0;
+	while (ptr != NULL) {
+		if (memcmp(s, ptr->nick, strlen(s)) == 0) {
+			if (rounds == i) {
+				return ptr->nick;
+			}
+			i++;
+		}
+		ptr = ptr->next;
+	}
+	return NULL;
+}
+
 static int get_cursor_position(int ifd, int ofd)
 {
     char buf[32];
@@ -313,21 +330,71 @@ static void edit_backspace(state l)
 
 static void edit_fill_nick(state l)
 {
+	static char find[WRAP_LEN] = "";
+	static int rounds = 0;
 	char *ptr;
+	char *found;
+	size_t len;
 
-	if ((l->posb == 0) || (l->buf[l->posb - 1] == ' ')) {
+	if (rounds == 0) {
+		l->nickposb = l->posb;
+	}
+	if ((l->nickposb == 0) || (l->buf[l->nickposb - 1] == ' ')) {
+		printf("\r\nhere %ld\n", l->nickposb);
 		return;
 	}
-	l->oldposb = l->posb;
 	// memcpy(l->buf + l->posb, "FUCK", strlen("FUCK"));
 	// l->posb += 4;
 	// l->posu8 += 4;
 	// l->lenb += 4;
 	// l->lenu8 += 4;
-	ptr = l->buf + l->posb;
-	printf("\r\n[%c]\r\n", *ptr);
-	// while ((l->posb) > 0 && (l->buf[l->posb - 1] == ' ')) { /* rwnd */
+	// ptr = l->buf + l->posb;
+	// printf("\r\n[%c]\r\n", *ptr);
+	len = 0;
+	while ((l->nickposb - len) > 0 && (l->buf[l->nickposb - len - 1] != ' ')) {
+		len += 1;
+	}
+	ptr = l->buf + l->nickposb - len;
+	if (memcmp(ptr, find, len) != 0) {
+		rounds = 0;
+	}
+	memcpy(find, ptr, len);
+	find[len] = '\0';
+	printf("\r\n");
+	printf("ptr [%s]\r\n", ptr);
+	printf("find [%s]\r\n", find);
+	// if (l->posb - len == 0) {
+	// 	printf("start\r\n");
 	// }
+	// else {
+	// 	printf("not the start\r\n");
+	// }
+	found = lnicks_find(*l->nicks, find, rounds);
+	printf("found [%s] | rounds %d\r\n", found, rounds);
+	rounds++;
+	if (found == NULL) {
+		rounds = 0;
+		return;
+	}
+
+	size_t len_diff = strlen(found) - strlen(find);
+	memmove(l->buf + l->nickposb + len_diff + (l->nickposb - len == 0 ? 2 : 1),
+		 l->buf + l->nickposb,
+		 strlen(l->buf + l->nickposb) + 1);
+	memmove(l->buf + l->nickposb, found + strlen(find), len_diff);
+	if (l->nickposb - len == 0) {
+		memmove(l->buf + l->nickposb + len_diff, ": ", 2);
+		l->lenb  += len_diff + 2;
+		l->lenu8 += len_diff + 2;
+		l->posb  += len_diff + 2;
+		l->posu8 += len_diff + 2;
+	}
+	else {
+		l->buf[l->nickposb + len_diff] = ' ';
+		l->lenb  += len_diff + 1;
+		l->lenu8 += len_diff + 1;
+	}
+
     // while ((l->posb > 0) && (l->buf[l->posb - 1] == ' ')) {
     //     l->posb--;
     //     l->posu8--;
@@ -552,6 +619,8 @@ static int edit(state l)
     case 21:
         edit_delete_whole_line(l);
         return 0;              /* Ctrl+u */
+    case 12:
+        return 0;              /* Ctrl+l */
     case 11:
         edit_delete_line_to_end(l);
         return 0;              /* Ctrl+k */
@@ -620,7 +689,7 @@ static inline void state_reset(state l)
         l->plenb = ptr - tok;
         l->plenu8 = u8_length(tok);
     }
-    l->oldposb = l->posb = l->oldposu8 = l->posu8 = l->lenb = l->lenu8 = l->nickposb = 0;
+    l->oldposb = l->posb = l->oldposu8 = l->posu8 = l->lenb = l->lenu8 = 0;
     l->history_index = 0;
     l->buf[0] = '\0';
     history_add("");
@@ -628,10 +697,13 @@ static inline void state_reset(state l)
 
 static void lnicks_add(lnicks_t **head, const char *n)
 {
-	lnicks_t *tmp;
-	lnicks_t *new;
+	lnicks tmp;
+	lnicks new;
 	if (n == NULL) {
 		return;
+	}
+	if (strchr("@~&%+", n[0]) != NULL) {
+		n = n + 1;
 	}
 	tmp = *head;
 	while (tmp != NULL) {
@@ -645,7 +717,7 @@ static void lnicks_add(lnicks_t **head, const char *n)
 		return;
 	}
 	if (strlen(n) < WRAP_LEN) {
-		strcpy(new->nick, n);
+		memcpy(new->nick, n, strlen(n) + 1);
 	}
 	else {
 		memcpy(new->nick, n, WRAP_LEN);
@@ -654,6 +726,7 @@ static void lnicks_add(lnicks_t **head, const char *n)
 	new->next = NULL;
 	if (*head == NULL) {
 		*head = new;
+		new->next = NULL;
 	}
 	else {
 		tmp = *head;
@@ -664,10 +737,31 @@ static void lnicks_add(lnicks_t **head, const char *n)
 	}
 }
 
+static void lnicks_del(lnicks_t **head, const char *n)
+{
+	lnicks tmp;
+	lnicks prev;
+	if (n == NULL) {
+		return;
+	}
+	tmp = *head;
+	prev = *head;
+	while (tmp != NULL) {
+		if (strcmp(n, tmp->nick) == 0) {
+			prev->next = tmp->next;
+			free(tmp);
+			tmp = NULL;
+			return;
+		}
+		prev = tmp;
+		tmp = tmp->next;
+	}
+}
+
 static void lnicks_clean(lnicks_t **head)
 {
-	lnicks_t *ptr;
-	lnicks_t *next;
+	lnicks ptr;
+	lnicks next;
 	ptr = *head;
 	if (head == NULL || ptr == NULL) {
 		return;
@@ -681,13 +775,24 @@ static void lnicks_clean(lnicks_t **head)
 	*head = NULL;
 }
 
+static void lnicks_parse_nicklist(lnicks_t **head, const char *msg)
+{
+	char *tok;
+	char line[MSG_MAX];
+
+	(void)head;
+	strcpy(line, msg);
+	tok = strtok((char*)line, " ");
+    while (tok != NULL) {
+		lnicks_add(head, tok);
+		tok = strtok(NULL, " ");
+	}
+}
+
 static void debug_lnicks_print(lnicks ln)
 {
-	lnicks_t *ptr;
+	lnicks ptr;
 	ptr = ln;
-	if (ln == NULL) {
-		return;
-	}
 	printf("[");
 	while (ptr != NULL) {
 		printf("%s", ptr->nick);
@@ -1307,7 +1412,7 @@ static void param_print_channel(param p)
     }
 }
 
-static void raw_parser(char *string, lnicks ln)
+static void raw_parser(char *string, lnicks *ln)
 {
     if (!memcmp(string, "PING", sizeof("PING") - 1)) {
         string[1] = 'O';
@@ -1336,9 +1441,6 @@ static void raw_parser(char *string, lnicks ln)
         .offset = 0,
     };
 
-	/* TODO: change this and use 353 */
-	lnicks_add(&ln, p.nickname);
-	debug_lnicks_print(ln);
 	p.nicklen = WRAP_LEN;
     if (*chan != '\0' && !memcmp(p.command, "001", sizeof("001") - 1)) {
         static char not_first_time = 0;
@@ -1365,12 +1467,24 @@ static void raw_parser(char *string, lnicks ln)
         memmove(chan, tok, ptr - tok + 1);
         return;
     }
-	if (filter_joins == 1 &&
-		(!memcmp(p.command, "QUIT", sizeof("QUIT") - 1) ||
-		 !memcmp(p.command, "PART", sizeof("PART") - 1) ||
-		 !memcmp(p.command, "JOIN", sizeof("JOIN") - 1) ||
-		 !memcmp(p.command, "NICK", sizeof("NICK") - 1))) {
-		return;
+	if (!memcmp(p.command, "QUIT", sizeof("QUIT") - 1) ||
+		!memcmp(p.command, "PART", sizeof("PART") - 1) ||
+		!memcmp(p.command, "JOIN", sizeof("JOIN") - 1) ||
+		!memcmp(p.command, "NICK", sizeof("NICK") - 1)) {
+		if (!memcmp(p.command, "JOIN", sizeof("JOIN") - 1)) {
+			lnicks_add(ln, p.nickname);
+		}
+		else if (!memcmp(p.command, "NICK", sizeof("NICK") - 1)) {
+			lnicks_del(ln, p.nickname);
+			lnicks_add(ln, p.message);
+		}
+		else {
+			lnicks_del(ln, p.nickname);
+		}
+		debug_lnicks_print(*ln);
+		if (filter_joins == 1) {
+			return;
+		}
 	}
 	if (!memcmp(p.command, "QUIT", sizeof("QUIT") - 1)) {
 		param_print_quit(&p);
@@ -1395,6 +1509,10 @@ static void raw_parser(char *string, lnicks ln)
         printf("\x1b[0m\r\n");
         return;
     }
+	if (!memcmp(p.command, "353", sizeof("353") - 1)) {
+		lnicks_parse_nicklist(ln, p.message);
+		debug_lnicks_print(*ln);
+	}
     param_print_channel(&p);
     message_wrap(&p);
     printf("\x1b[0m\r\n");
@@ -1403,7 +1521,7 @@ static void raw_parser(char *string, lnicks ln)
 static char message_buffer[MSG_MAX + 1];
 static size_t message_end = 0;
 
-static int handle_server_message(lnicks ln)
+static int handle_server_message(lnicks *ln)
 {
     for (;;) {
         ssize_t nread = read(conn, &message_buffer[message_end],
@@ -2134,14 +2252,7 @@ int main(int argc, char **argv)
     memset(&l, 0, sizeof(l));
     state_reset(&l);
 	lnicks_t *lnicks = NULL;
-	l.nicks = lnicks;
-	lnicks_add(&lnicks, "jozan");
-	lnicks_add(&lnicks, "jozan");
-	lnicks_add(&lnicks, "joe");
-	lnicks_add(&lnicks, "qwe");
-	lnicks_add(&lnicks, "joe");
-	lnicks_add(&lnicks, "joeqwe");
-	debug_lnicks_print(lnicks);
+	l.nicks = &lnicks;
     int rc, editReturnFlag = 0;
     if (enable_raw_mode(ttyinfd) == -1) {
         return 1;
@@ -2171,7 +2282,7 @@ int main(int argc, char **argv)
             refresh_line(&l);
         }
         if (dcc_sessions.sock_fds[CON_MAX + 1].revents & POLLIN) {
-            rc = handle_server_message(lnicks);
+            rc = handle_server_message(&lnicks);
             if (rc == -2) {
                 return 1;
             }
